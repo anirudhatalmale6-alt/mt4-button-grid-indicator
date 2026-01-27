@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Custom Indicator"
 #property link      ""
-#property version   "1.00"
+#property version   "1.01"
 #property strict
 #property indicator_chart_window
 
@@ -35,6 +35,11 @@ input color  InpHeaderTextColor= clrYellow;      // Header Text Color (H1/H4/D1)
 input int    InpHeaderFontSize = 8;              // Header Font Size
 
 //+------------------------------------------------------------------+
+//| PERSISTENCE PARAMETERS                                            |
+//+------------------------------------------------------------------+
+input string InpStateFileName  = "ButtonGridState";  // State File Name (without extension)
+
+//+------------------------------------------------------------------+
 //| GRID CONFIGURATION                                                |
 //+------------------------------------------------------------------+
 #define ROWS 28
@@ -49,11 +54,17 @@ string PREFIX = "BtnGrid_";
 // Column headers
 string ColHeaders[COLS] = {"H1", "H4", "D1"};
 
+// State file path
+string StateFilePath;
+
 //+------------------------------------------------------------------+
 //| Custom indicator initialization function                          |
 //+------------------------------------------------------------------+
 int OnInit()
 {
+   // Build state file path (saved in MQL4/Files folder)
+   StateFilePath = InpStateFileName + "_" + Symbol() + ".dat";
+
    // Initialize all buttons to gray state (0)
    for(int row = 0; row < ROWS; row++)
    {
@@ -62,6 +73,9 @@ int OnInit()
          ButtonState[row][col] = 0;
       }
    }
+
+   // Load saved states from file (if exists)
+   LoadButtonStates();
 
    // Enable chart events for click detection
    ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true);
@@ -77,6 +91,9 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
+   // Save button states before removing indicator
+   SaveButtonStates();
+
    // Remove all objects created by this indicator
    ObjectsDeleteAll(0, PREFIX);
 }
@@ -128,9 +145,77 @@ void OnChartEvent(const int id,
 
                // Update button color
                UpdateButtonColor(row, col);
+
+               // Save states immediately after each click
+               SaveButtonStates();
             }
          }
       }
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Save button states to file                                        |
+//+------------------------------------------------------------------+
+void SaveButtonStates()
+{
+   int fileHandle = FileOpen(StateFilePath, FILE_WRITE|FILE_BIN);
+
+   if(fileHandle != INVALID_HANDLE)
+   {
+      // Write all button states
+      for(int row = 0; row < ROWS; row++)
+      {
+         for(int col = 0; col < COLS; col++)
+         {
+            FileWriteInteger(fileHandle, ButtonState[row][col], CHAR_VALUE);
+         }
+      }
+      FileClose(fileHandle);
+   }
+   else
+   {
+      Print("ButtonGrid: Failed to save states to file: ", StateFilePath);
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Load button states from file                                      |
+//+------------------------------------------------------------------+
+void LoadButtonStates()
+{
+   if(!FileIsExist(StateFilePath))
+   {
+      Print("ButtonGrid: No saved state file found, starting fresh.");
+      return;
+   }
+
+   int fileHandle = FileOpen(StateFilePath, FILE_READ|FILE_BIN);
+
+   if(fileHandle != INVALID_HANDLE)
+   {
+      // Read all button states
+      for(int row = 0; row < ROWS; row++)
+      {
+         for(int col = 0; col < COLS; col++)
+         {
+            if(!FileIsEnding(fileHandle))
+            {
+               int state = FileReadInteger(fileHandle, CHAR_VALUE);
+               // Validate state (0, 1, or 2)
+               if(state >= 0 && state <= 2)
+               {
+                  ButtonState[row][col] = state;
+               }
+            }
+         }
+      }
+      FileClose(fileHandle);
+      Print("ButtonGrid: States loaded successfully from file.");
+   }
+   else
+   {
+      Print("ButtonGrid: Failed to load states from file: ", StateFilePath);
    }
 }
 
