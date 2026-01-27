@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Custom Indicator"
 #property link      ""
-#property version   "1.01"
+#property version   "1.02"
 #property strict
 #property indicator_chart_window
 
@@ -63,7 +63,8 @@ string StateFilePath;
 int OnInit()
 {
    // Build state file path (saved in MQL4/Files folder)
-   StateFilePath = InpStateFileName + "_" + Symbol() + ".dat";
+   // Using single shared file for all charts/symbols
+   StateFilePath = InpStateFileName + ".dat";
 
    // Initialize all buttons to gray state (0)
    for(int row = 0; row < ROWS; row++)
