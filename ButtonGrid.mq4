@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Custom Indicator"
 #property link      ""
-#property version   "1.02"
+#property version   "1.03"
 #property strict
 #property indicator_chart_window
 
@@ -33,6 +33,8 @@ input color  InpColorRed       = clrRed;         // Button Color: Red (2nd click
 input color  InpColorBorder    = clrGray;        // Button Border Color
 input color  InpHeaderTextColor= clrYellow;      // Header Text Color (H1/H4/D1)
 input int    InpHeaderFontSize = 8;              // Header Font Size
+input color  InpBackgroundColor= clrBlack;       // Background Panel Color
+input int    InpBackgroundPadding = 5;           // Background Padding (pixels)
 
 //+------------------------------------------------------------------+
 //| PERSISTENCE PARAMETERS                                            |
@@ -225,6 +227,9 @@ void LoadButtonStates()
 //+------------------------------------------------------------------+
 void CreateButtonGrid()
 {
+   // Create background panel first (so it's behind everything)
+   CreateBackgroundPanel();
+
    // Create header labels (H1, H4, D1)
    for(int col = 0; col < COLS; col++)
    {
@@ -252,6 +257,38 @@ void CreateButtonGrid()
          CreateButton(row, col);
       }
    }
+}
+
+//+------------------------------------------------------------------+
+//| Create background panel behind the button grid                    |
+//+------------------------------------------------------------------+
+void CreateBackgroundPanel()
+{
+   string bgName = PREFIX + "Background";
+
+   // Calculate panel dimensions
+   int panelWidth = COLS * (InpButtonWidth + InpButtonSpacingX) - InpButtonSpacingX + (InpBackgroundPadding * 2);
+   int panelHeight = InpHeaderHeight + ROWS * (InpButtonHeight + InpButtonSpacingY) - InpButtonSpacingY + (InpBackgroundPadding * 2);
+
+   // Panel position (offset by padding)
+   int panelX = InpOffsetX - InpBackgroundPadding;
+   int panelY = InpOffsetY - InpBackgroundPadding;
+
+   ObjectCreate(0, bgName, OBJ_RECTANGLE_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, bgName, OBJPROP_XDISTANCE, panelX);
+   ObjectSetInteger(0, bgName, OBJPROP_YDISTANCE, panelY);
+   ObjectSetInteger(0, bgName, OBJPROP_XSIZE, panelWidth);
+   ObjectSetInteger(0, bgName, OBJPROP_YSIZE, panelHeight);
+   ObjectSetInteger(0, bgName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, bgName, OBJPROP_BGCOLOR, InpBackgroundColor);
+   ObjectSetInteger(0, bgName, OBJPROP_BORDER_TYPE, BORDER_FLAT);
+   ObjectSetInteger(0, bgName, OBJPROP_BORDER_COLOR, InpBackgroundColor);
+   ObjectSetInteger(0, bgName, OBJPROP_WIDTH, 0);
+   ObjectSetInteger(0, bgName, OBJPROP_BACK, false);
+   ObjectSetInteger(0, bgName, OBJPROP_SELECTABLE, false);
+   ObjectSetInteger(0, bgName, OBJPROP_SELECTED, false);
+   ObjectSetInteger(0, bgName, OBJPROP_HIDDEN, true);
+   ObjectSetInteger(0, bgName, OBJPROP_ZORDER, 0);  // Behind buttons
 }
 
 //+------------------------------------------------------------------+
