@@ -6,7 +6,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Custom Indicator"
 #property link      ""
-#property version   "2.00"
+#property version   "2.01"
 #property strict
 #property indicator_chart_window
 
@@ -556,9 +556,9 @@ void CreateNoteField(int row)
    ObjectSetInteger(0, noteName, OBJPROP_YSIZE, InpButtonHeight);
    ObjectSetInteger(0, noteName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
    ObjectSetInteger(0, noteName, OBJPROP_BGCOLOR, InpBackgroundColor);
-   ObjectSetInteger(0, noteName, OBJPROP_BORDER_COLOR, InpColorBorder);
+   ObjectSetInteger(0, noteName, OBJPROP_BORDER_COLOR, InpBackgroundColor);  // No visible border
    ObjectSetInteger(0, noteName, OBJPROP_COLOR, InpNoteTextColor);
-   ObjectSetString(0, noteName, OBJPROP_FONT, "Arial");
+   ObjectSetString(0, noteName, OBJPROP_FONT, "Arial");  // Arial Regular
    ObjectSetInteger(0, noteName, OBJPROP_FONTSIZE, InpNoteFontSize);
    ObjectSetString(0, noteName, OBJPROP_TEXT, NoteText[row]);
    ObjectSetInteger(0, noteName, OBJPROP_ALIGN, ALIGN_LEFT);
