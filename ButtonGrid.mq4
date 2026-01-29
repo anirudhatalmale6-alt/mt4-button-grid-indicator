@@ -2,10 +2,11 @@
 //|                                                   ButtonGrid.mq4 |
 //|                              Custom Button Grid Indicator        |
 //|                         28 rows x 3 columns (H1, H4, D1)         |
+//|                    + Notes, Timeframe Display, Local Clock       |
 //+------------------------------------------------------------------+
 #property copyright "Custom Indicator"
 #property link      ""
-#property version   "1.03"
+#property version   "2.00"
 #property strict
 #property indicator_chart_window
 
@@ -23,6 +24,30 @@ input int    InpButtonHeight   = 18;        // Button Height (pixels)
 input int    InpButtonSpacingX = 2;         // Horizontal spacing between buttons
 input int    InpButtonSpacingY = 2;         // Vertical spacing between buttons
 input int    InpHeaderHeight   = 20;        // Header row height
+
+//+------------------------------------------------------------------+
+//| NOTE PARAMETERS - Editable text next to each row                  |
+//+------------------------------------------------------------------+
+input int    InpNoteWidth      = 60;        // Note Field Width (pixels)
+input int    InpNoteSpacing    = 5;         // Space between buttons and note
+input color  InpNoteTextColor  = clrWhite;  // Note Text Color
+input int    InpNoteFontSize   = 8;         // Note Font Size
+
+//+------------------------------------------------------------------+
+//| TIMEFRAME & SYMBOL DISPLAY PARAMETERS                             |
+//+------------------------------------------------------------------+
+input int    InpTFDisplayX     = 200;       // Timeframe Display X Position
+input int    InpTFDisplayY     = 30;        // Timeframe Display Y Position
+input color  InpTFDisplayColor = clrYellow; // Timeframe Display Color
+input int    InpTFDisplaySize  = 20;        // Timeframe Display Font Size
+
+//+------------------------------------------------------------------+
+//| CLOCK PARAMETERS                                                  |
+//+------------------------------------------------------------------+
+input int    InpClockX         = 500;       // Clock X Position
+input int    InpClockY         = 30;        // Clock Y Position
+input color  InpClockColor     = clrYellow; // Clock Color
+input int    InpClockFontSize  = 16;        // Clock Font Size
 
 //+------------------------------------------------------------------+
 //| COLOR PARAMETERS - Customize all colors from Inputs tab          |
@@ -50,6 +75,9 @@ input string InpStateFileName  = "ButtonGridState";  // State File Name (without
 // Button state: 0=Gray, 1=Green, 2=Red
 int ButtonState[ROWS][COLS];
 
+// Note text for each row
+string NoteText[ROWS];
+
 // Object name prefix
 string PREFIX = "BtnGrid_";
 
@@ -58,19 +86,21 @@ string ColHeaders[COLS] = {"H1", "H4", "D1"};
 
 // State file path
 string StateFilePath;
+string NotesFilePath;
 
 //+------------------------------------------------------------------+
 //| Custom indicator initialization function                          |
 //+------------------------------------------------------------------+
 int OnInit()
 {
-   // Build state file path (saved in MQL4/Files folder)
-   // Using single shared file for all charts/symbols
+   // Build state file paths (saved in MQL4/Files folder)
    StateFilePath = InpStateFileName + ".dat";
+   NotesFilePath = InpStateFileName + "_notes.txt";
 
-   // Initialize all buttons to gray state (0)
+   // Initialize all buttons to gray state (0) and notes to empty
    for(int row = 0; row < ROWS; row++)
    {
+      NoteText[row] = "";
       for(int col = 0; col < COLS; col++)
       {
          ButtonState[row][col] = 0;
@@ -79,12 +109,18 @@ int OnInit()
 
    // Load saved states from file (if exists)
    LoadButtonStates();
+   LoadNotes();
 
    // Enable chart events for click detection
    ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true);
 
-   // Create the button grid
+   // Set timer for clock updates (every second)
+   EventSetTimer(1);
+
+   // Create all UI elements
    CreateButtonGrid();
+   CreateTimeframeDisplay();
+   CreateClockDisplay();
 
    return(INIT_SUCCEEDED);
 }
@@ -94,11 +130,23 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
-   // Save button states before removing indicator
+   // Kill timer
+   EventKillTimer();
+
+   // Save button states and notes before removing indicator
    SaveButtonStates();
+   SaveNotes();
 
    // Remove all objects created by this indicator
    ObjectsDeleteAll(0, PREFIX);
+}
+
+//+------------------------------------------------------------------+
+//| Timer function - updates clock every second                       |
+//+------------------------------------------------------------------+
+void OnTimer()
+{
+   UpdateClockDisplay();
 }
 
 //+------------------------------------------------------------------+
@@ -119,7 +167,7 @@ int OnCalculate(const int rates_total,
 }
 
 //+------------------------------------------------------------------+
-//| ChartEvent function - handles mouse clicks                        |
+//| ChartEvent function - handles mouse clicks and text edits         |
 //+------------------------------------------------------------------+
 void OnChartEvent(const int id,
                   const long &lparam,
@@ -152,6 +200,25 @@ void OnChartEvent(const int id,
                // Save states immediately after each click
                SaveButtonStates();
             }
+         }
+      }
+   }
+
+   // Check for edit box text change
+   if(id == CHARTEVENT_OBJECT_ENDEDIT)
+   {
+      if(StringFind(sparam, PREFIX + "Note_") == 0)
+      {
+         // Parse row from object name
+         string rowStr = StringSubstr(sparam, StringLen(PREFIX + "Note_"));
+         int row = (int)StringToInteger(rowStr);
+
+         if(row >= 0 && row < ROWS)
+         {
+            // Get the new text
+            NoteText[row] = ObjectGetString(0, sparam, OBJPROP_TEXT);
+            // Save notes
+            SaveNotes();
          }
       }
    }
@@ -223,12 +290,158 @@ void LoadButtonStates()
 }
 
 //+------------------------------------------------------------------+
+//| Save notes to file                                                |
+//+------------------------------------------------------------------+
+void SaveNotes()
+{
+   int fileHandle = FileOpen(NotesFilePath, FILE_WRITE|FILE_TXT);
+
+   if(fileHandle != INVALID_HANDLE)
+   {
+      for(int row = 0; row < ROWS; row++)
+      {
+         FileWriteString(fileHandle, NoteText[row] + "\n");
+      }
+      FileClose(fileHandle);
+   }
+   else
+   {
+      Print("ButtonGrid: Failed to save notes to file: ", NotesFilePath);
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Load notes from file                                              |
+//+------------------------------------------------------------------+
+void LoadNotes()
+{
+   if(!FileIsExist(NotesFilePath))
+   {
+      Print("ButtonGrid: No saved notes file found.");
+      return;
+   }
+
+   int fileHandle = FileOpen(NotesFilePath, FILE_READ|FILE_TXT);
+
+   if(fileHandle != INVALID_HANDLE)
+   {
+      for(int row = 0; row < ROWS; row++)
+      {
+         if(!FileIsEnding(fileHandle))
+         {
+            string line = FileReadString(fileHandle);
+            // Remove trailing newline if present
+            StringReplace(line, "\n", "");
+            StringReplace(line, "\r", "");
+            NoteText[row] = line;
+         }
+      }
+      FileClose(fileHandle);
+      Print("ButtonGrid: Notes loaded successfully from file.");
+   }
+   else
+   {
+      Print("ButtonGrid: Failed to load notes from file: ", NotesFilePath);
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Get timeframe string                                              |
+//+------------------------------------------------------------------+
+string GetTimeframeString()
+{
+   switch(Period())
+   {
+      case PERIOD_M1:  return "M1";
+      case PERIOD_M5:  return "M5";
+      case PERIOD_M15: return "M15";
+      case PERIOD_M30: return "M30";
+      case PERIOD_H1:  return "H1";
+      case PERIOD_H4:  return "H4";
+      case PERIOD_D1:  return "D1";
+      case PERIOD_W1:  return "W1";
+      case PERIOD_MN1: return "MN";
+      default:         return "??";
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Create timeframe and symbol display                               |
+//+------------------------------------------------------------------+
+void CreateTimeframeDisplay()
+{
+   string tfName = PREFIX + "TFDisplay";
+   string displayText = GetTimeframeString() + " " + Symbol();
+
+   ObjectCreate(0, tfName, OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, tfName, OBJPROP_XDISTANCE, InpTFDisplayX);
+   ObjectSetInteger(0, tfName, OBJPROP_YDISTANCE, InpTFDisplayY);
+   ObjectSetInteger(0, tfName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, tfName, OBJPROP_ANCHOR, ANCHOR_LEFT);
+   ObjectSetString(0, tfName, OBJPROP_TEXT, displayText);
+   ObjectSetString(0, tfName, OBJPROP_FONT, "Arial Bold");
+   ObjectSetInteger(0, tfName, OBJPROP_FONTSIZE, InpTFDisplaySize);
+   ObjectSetInteger(0, tfName, OBJPROP_COLOR, InpTFDisplayColor);
+   ObjectSetInteger(0, tfName, OBJPROP_SELECTABLE, false);
+}
+
+//+------------------------------------------------------------------+
+//| Create clock display                                              |
+//+------------------------------------------------------------------+
+void CreateClockDisplay()
+{
+   string clockName = PREFIX + "Clock";
+
+   ObjectCreate(0, clockName, OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, clockName, OBJPROP_XDISTANCE, InpClockX);
+   ObjectSetInteger(0, clockName, OBJPROP_YDISTANCE, InpClockY);
+   ObjectSetInteger(0, clockName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, clockName, OBJPROP_ANCHOR, ANCHOR_LEFT);
+   ObjectSetString(0, clockName, OBJPROP_FONT, "Arial Bold");
+   ObjectSetInteger(0, clockName, OBJPROP_FONTSIZE, InpClockFontSize);
+   ObjectSetInteger(0, clockName, OBJPROP_COLOR, InpClockColor);
+   ObjectSetInteger(0, clockName, OBJPROP_SELECTABLE, false);
+
+   // Set initial time
+   UpdateClockDisplay();
+}
+
+//+------------------------------------------------------------------+
+//| Update clock display                                              |
+//+------------------------------------------------------------------+
+void UpdateClockDisplay()
+{
+   string clockName = PREFIX + "Clock";
+   datetime localTime = TimeLocal();
+   string timeStr = TimeToString(localTime, TIME_SECONDS);
+
+   ObjectSetString(0, clockName, OBJPROP_TEXT, timeStr);
+   ChartRedraw(0);
+}
+
+//+------------------------------------------------------------------+
 //| Create the entire button grid                                     |
 //+------------------------------------------------------------------+
 void CreateButtonGrid()
 {
    // Create background panel first (so it's behind everything)
    CreateBackgroundPanel();
+
+   // Create "Note" header
+   string noteHeaderName = PREFIX + "NoteHeader";
+   int noteHeaderX = InpOffsetX + COLS * (InpButtonWidth + InpButtonSpacingX) + InpNoteSpacing;
+   int noteHeaderY = InpOffsetY;
+
+   ObjectCreate(0, noteHeaderName, OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, noteHeaderName, OBJPROP_XDISTANCE, noteHeaderX);
+   ObjectSetInteger(0, noteHeaderName, OBJPROP_YDISTANCE, noteHeaderY);
+   ObjectSetInteger(0, noteHeaderName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, noteHeaderName, OBJPROP_ANCHOR, ANCHOR_LEFT);
+   ObjectSetString(0, noteHeaderName, OBJPROP_TEXT, "Note");
+   ObjectSetString(0, noteHeaderName, OBJPROP_FONT, "Arial Bold");
+   ObjectSetInteger(0, noteHeaderName, OBJPROP_FONTSIZE, InpHeaderFontSize);
+   ObjectSetInteger(0, noteHeaderName, OBJPROP_COLOR, InpHeaderTextColor);
+   ObjectSetInteger(0, noteHeaderName, OBJPROP_SELECTABLE, false);
 
    // Create header labels (H1, H4, D1)
    for(int col = 0; col < COLS; col++)
@@ -249,13 +462,17 @@ void CreateButtonGrid()
       ObjectSetInteger(0, headerName, OBJPROP_SELECTABLE, false);
    }
 
-   // Create button grid
+   // Create button grid and note fields
    for(int row = 0; row < ROWS; row++)
    {
+      // Create buttons for this row
       for(int col = 0; col < COLS; col++)
       {
          CreateButton(row, col);
       }
+
+      // Create note edit field for this row
+      CreateNoteField(row);
    }
 }
 
@@ -266,8 +483,8 @@ void CreateBackgroundPanel()
 {
    string bgName = PREFIX + "Background";
 
-   // Calculate panel dimensions
-   int panelWidth = COLS * (InpButtonWidth + InpButtonSpacingX) - InpButtonSpacingX + (InpBackgroundPadding * 2);
+   // Calculate panel dimensions (including note fields)
+   int panelWidth = COLS * (InpButtonWidth + InpButtonSpacingX) - InpButtonSpacingX + InpNoteSpacing + InpNoteWidth + (InpBackgroundPadding * 2);
    int panelHeight = InpHeaderHeight + ROWS * (InpButtonHeight + InpButtonSpacingY) - InpButtonSpacingY + (InpBackgroundPadding * 2);
 
    // Panel position (offset by padding)
@@ -318,6 +535,36 @@ void CreateButton(int row, int col)
    ObjectSetInteger(0, btnName, OBJPROP_SELECTED, false);
    ObjectSetInteger(0, btnName, OBJPROP_HIDDEN, true);
    ObjectSetInteger(0, btnName, OBJPROP_ZORDER, 1);
+}
+
+//+------------------------------------------------------------------+
+//| Create note edit field for a row                                  |
+//+------------------------------------------------------------------+
+void CreateNoteField(int row)
+{
+   string noteName = PREFIX + "Note_" + IntegerToString(row);
+
+   // Calculate position (to the right of the buttons)
+   int noteX = InpOffsetX + COLS * (InpButtonWidth + InpButtonSpacingX) + InpNoteSpacing;
+   int noteY = InpOffsetY + InpHeaderHeight + row * (InpButtonHeight + InpButtonSpacingY);
+
+   // Create editable text field
+   ObjectCreate(0, noteName, OBJ_EDIT, 0, 0, 0);
+   ObjectSetInteger(0, noteName, OBJPROP_XDISTANCE, noteX);
+   ObjectSetInteger(0, noteName, OBJPROP_YDISTANCE, noteY);
+   ObjectSetInteger(0, noteName, OBJPROP_XSIZE, InpNoteWidth);
+   ObjectSetInteger(0, noteName, OBJPROP_YSIZE, InpButtonHeight);
+   ObjectSetInteger(0, noteName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, noteName, OBJPROP_BGCOLOR, InpBackgroundColor);
+   ObjectSetInteger(0, noteName, OBJPROP_BORDER_COLOR, InpColorBorder);
+   ObjectSetInteger(0, noteName, OBJPROP_COLOR, InpNoteTextColor);
+   ObjectSetString(0, noteName, OBJPROP_FONT, "Arial");
+   ObjectSetInteger(0, noteName, OBJPROP_FONTSIZE, InpNoteFontSize);
+   ObjectSetString(0, noteName, OBJPROP_TEXT, NoteText[row]);
+   ObjectSetInteger(0, noteName, OBJPROP_ALIGN, ALIGN_LEFT);
+   ObjectSetInteger(0, noteName, OBJPROP_READONLY, false);
+   ObjectSetInteger(0, noteName, OBJPROP_SELECTABLE, false);
+   ObjectSetInteger(0, noteName, OBJPROP_ZORDER, 1);
 }
 
 //+------------------------------------------------------------------+
