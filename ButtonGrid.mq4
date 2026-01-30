@@ -6,7 +6,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Custom Indicator"
 #property link      ""
-#property version   "2.01"
+#property version   "2.02"
 #property strict
 #property indicator_chart_window
 
@@ -34,12 +34,20 @@ input color  InpNoteTextColor  = clrWhite;  // Note Text Color
 input int    InpNoteFontSize   = 8;         // Note Font Size
 
 //+------------------------------------------------------------------+
-//| TIMEFRAME & SYMBOL DISPLAY PARAMETERS                             |
+//| TIMEFRAME DISPLAY PARAMETERS                                      |
 //+------------------------------------------------------------------+
-input int    InpTFDisplayX     = 200;       // Timeframe Display X Position
-input int    InpTFDisplayY     = 30;        // Timeframe Display Y Position
-input color  InpTFDisplayColor = clrYellow; // Timeframe Display Color
-input int    InpTFDisplaySize  = 20;        // Timeframe Display Font Size
+input int    InpTFDisplayX     = 200;       // Timeframe X Position
+input int    InpTFDisplayY     = 30;        // Timeframe Y Position
+input color  InpTFDisplayColor = clrYellow; // Timeframe Color
+input int    InpTFDisplaySize  = 20;        // Timeframe Font Size
+
+//+------------------------------------------------------------------+
+//| SYMBOL DISPLAY PARAMETERS                                         |
+//+------------------------------------------------------------------+
+input int    InpSymbolDisplayX     = 280;       // Symbol X Position
+input int    InpSymbolDisplayY     = 30;        // Symbol Y Position
+input color  InpSymbolDisplayColor = clrYellow; // Symbol Color
+input int    InpSymbolDisplaySize  = 20;        // Symbol Font Size
 
 //+------------------------------------------------------------------+
 //| CLOCK PARAMETERS                                                  |
@@ -366,23 +374,35 @@ string GetTimeframeString()
 }
 
 //+------------------------------------------------------------------+
-//| Create timeframe and symbol display                               |
+//| Create timeframe and symbol display (separate labels)             |
 //+------------------------------------------------------------------+
 void CreateTimeframeDisplay()
 {
+   // Timeframe label
    string tfName = PREFIX + "TFDisplay";
-   string displayText = GetTimeframeString() + " " + Symbol();
-
    ObjectCreate(0, tfName, OBJ_LABEL, 0, 0, 0);
    ObjectSetInteger(0, tfName, OBJPROP_XDISTANCE, InpTFDisplayX);
    ObjectSetInteger(0, tfName, OBJPROP_YDISTANCE, InpTFDisplayY);
    ObjectSetInteger(0, tfName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
    ObjectSetInteger(0, tfName, OBJPROP_ANCHOR, ANCHOR_LEFT);
-   ObjectSetString(0, tfName, OBJPROP_TEXT, displayText);
+   ObjectSetString(0, tfName, OBJPROP_TEXT, GetTimeframeString());
    ObjectSetString(0, tfName, OBJPROP_FONT, "Arial Bold");
    ObjectSetInteger(0, tfName, OBJPROP_FONTSIZE, InpTFDisplaySize);
    ObjectSetInteger(0, tfName, OBJPROP_COLOR, InpTFDisplayColor);
    ObjectSetInteger(0, tfName, OBJPROP_SELECTABLE, false);
+
+   // Symbol label (separate)
+   string symbolName = PREFIX + "SymbolDisplay";
+   ObjectCreate(0, symbolName, OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, symbolName, OBJPROP_XDISTANCE, InpSymbolDisplayX);
+   ObjectSetInteger(0, symbolName, OBJPROP_YDISTANCE, InpSymbolDisplayY);
+   ObjectSetInteger(0, symbolName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, symbolName, OBJPROP_ANCHOR, ANCHOR_LEFT);
+   ObjectSetString(0, symbolName, OBJPROP_TEXT, Symbol());
+   ObjectSetString(0, symbolName, OBJPROP_FONT, "Arial Bold");
+   ObjectSetInteger(0, symbolName, OBJPROP_FONTSIZE, InpSymbolDisplaySize);
+   ObjectSetInteger(0, symbolName, OBJPROP_COLOR, InpSymbolDisplayColor);
+   ObjectSetInteger(0, symbolName, OBJPROP_SELECTABLE, false);
 }
 
 //+------------------------------------------------------------------+
